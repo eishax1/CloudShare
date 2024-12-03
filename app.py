@@ -1,21 +1,31 @@
 from flask import Flask, render_template, request, redirect, session, make_response, jsonify
 from azure.storage.blob import BlobServiceClient
-
+import os
 import bcrypt
+from dotenv import load_dotenv
 from decorators.token import create_token
 from pymongo import MongoClient
 from bson import ObjectId  
+from pymongo.collection import Collection
+from pymongo.database import Database
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'mysecret'
 
-# MongoDB Setup
-client = MongoClient("mongodb://127.0.0.1:27017")
-db = client.Backend
-users = db.users
-blacklist = db.blacklist
+# access your MongoDB Atlas cluster
+load_dotenv()
+connection_string: str = os.getenv("CONNECTION_STRING")
+mongo_client: MongoClient = MongoClient(connection_string)
+
+# add in your database and collection from Atlas
+database: Database = mongo_client.get_database("users")
+collection: Collection = database.get_collection("Cloud")
+collection2: Collection = database.get_collection("blacklist")
+
+
+
 
 # Azure Blob Storage connection setup
-connect_str = 'DefaultEndpointsProtocol=https;AccountName=mediaup;AccountKey=SBn3IhD0diIWwdHlqYqhRCbuePqC3Mqg+8KDfuRcf81RQByTCERbwckOJU6aHDR7Y1SeW0eZb4xg+AStnwZZmw==;EndpointSuffix=core.windows.net'
+connect_str = os.getenv("connect_str")
 container_name = "media"
 blob_service_client = BlobServiceClient.from_connection_string(conn_str=connect_str)
 
@@ -36,7 +46,7 @@ def register():
         email = request.form.get('email')
         
         # Check if the username already exists
-        existing_user = users.find_one({"username": username})
+        existing_user = collection.find_one({"username": username})
         if existing_user:
             return make_response(jsonify({'message': 'Username already exists. Please choose a different username.'}), 409)
 
@@ -49,7 +59,7 @@ def register():
             "password": hashed_password,  
             "email": email
         }
-        users.insert_one(new_user)
+        collection.insert_one(new_user)
 
         return redirect('/index')
 
@@ -65,7 +75,7 @@ def login():
         username = request.form.get("username")
         password = request.form.get("password")
         
-        user = users.find_one({"username": username})
+        user = collection.find_one({"username": username})
         if user and bcrypt.checkpw(password.encode('utf-8'), user["password"]):
             token = create_token(user)
             session.clear()
@@ -82,7 +92,7 @@ def logout():
     token = request.headers.get('x-access-token')
     if token:
         
-        blacklist.insert_one({'token': token})
+        collection2.insert_one({'token': token})
     
     session.clear()
     return redirect("/")
@@ -104,7 +114,7 @@ def view_photos():
         user_id = blob.name.split('/')[0]   
         
         # Fetch the user's username
-        user = users.find_one({"_id": ObjectId(user_id)})  # Use ObjectId here
+        user = collection.find_one({"_id": ObjectId(user_id)})  # Use ObjectId here
         username = user["username"] if user else "Unknown User"
         
         img_data.append({"img_url": blob_client.url, "username": username})
