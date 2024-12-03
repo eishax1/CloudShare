@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Photo Caption</title>
+</head>
+<body>
+    <h1>Edit Caption for {{ photo['filename'] }}</h1>
+    <form method="POST">
+        <label for="caption">New Caption:</label>
+        <input type="text" id="caption" name="caption" value="{{ photo['caption'] }}" required>
+        <button type="submit">Save Changes</button>
+    </form>
+    <br>
+    <a href="/index">Back to Home</a>
+</body>
+</html>

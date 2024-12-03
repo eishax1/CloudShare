@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudShare</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">CloudShare</a>
+            <div class="d-flex">
+                {% if session['user_id'] %}
+                    <span class="navbar-text text-light">
+                        Logged in as: {{ session['username'] }}
+                    </span>
+                    <a href="/logout" class="btn btn-outline-light ms-3">Logout</a>
+                {% else %}
+                    <a href="/login" class="btn btn-outline-light">Login</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card" style="margin: 1em 0; padding: 1em 0 0 0; align-items: center;">
+            <h3>Upload new File</h3>
+            <div class="form-group">
+                <form method="post" action="/upload-photos" enctype="multipart/form-data">
+                    <div style="display: flex;">
+                        <input type="file" accept=".png, .jpeg, .jpg, .gif" name="photos" multiple class="form-control" style="margin-right: 1em;">
+                        <input type="submit" class="btn btn-primary">
+                    </div>
+                </form>
+            </div> 
+        </div>
+
+        <div class="gallery" style="display: flex; flex-wrap: wrap; gap: 1em;">
+            {% if img_data %}
+                {% for photo in img_data %}
+                    <div class="photo-card" style="text-align: center; width: calc(33% - 1em);">
+                        <img src="{{ photo['img_url'] }}" alt="User Photo" style="max-width: 100%; height: auto; border-radius: 8px;">
+                        <p>Uploaded by: {{ photo['username'] }}</p>
+                        
+                        {% if photo['user_id'] == session['user_id'] %}
+                            <div>
+                                <!-- Edit Caption Form -->
+                                <form method="POST" action="/edit-caption/{{ photo['img_url'] }}">
+                                    <input type="text" name="caption" value="{{ photo['caption'] }}" class="form-control" placeholder="Edit caption">
+                                    <button type="submit" class="btn btn-warning mt-2">Save Caption</button>
+                                </form>
+
+                                <!-- Delete Photo Form -->
+                                <form method="POST" action="/delete-photo/{{ photo['img_url'] }}" style="margin-top: 10px;">
+                                    <button type="submit" class="btn btn-danger">Delete Photo</button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p>No photos to display.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-pzjw8f+ua7Kw1TIq0GpT2zj0zzbPTkP1B8Vq1Ow07Zqmpb6SCu8FOu7mXxINbQUg" crossorigin="anonymous"></script>
+</body>
+</html>
