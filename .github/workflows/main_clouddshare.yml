@@ -2,7 +2,7 @@
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 # More info on Python, GitHub Actions, and Azure App Service: https://aka.ms/python-webapps-actions
 
-name: Build and deploy Python app to Azure Web App - ClouddShare
+name: Build and deploy Python app to Azure Web App - Clouddshare
 
 on:
   push:
@@ -65,14 +65,14 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_6A1EE6A7849244428C0214DB44AB37F8 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_F6A1251164E94708AC44FBA1D58DD561 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_6AE27333C53143518C12F1E4D5415BBC }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_32A6263D13074C35A6814C7CF899D422 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B28C8C2700354E3E9B6BD14CEBD5F4ED }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_79347C5A768C4A62901EB20E01FD7769 }}
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
-          app-name: 'ClouddShare'
+          app-name: 'Clouddshare'
           slot-name: 'Production'
           
