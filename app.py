@@ -61,7 +61,7 @@ def register():
         }
         collection.insert_one(new_user)
 
-        return redirect('/')
+        return redirect('/index')
 
     return render_template("register.html")
 
@@ -81,7 +81,7 @@ def login():
             session.clear()
             session['user_id'] = str(user['_id'])
             session['username'] = str(user['username'])
-            return redirect("/dashoard")
+            return redirect("/index")
         else:
             return make_response(jsonify({'message': 'Invalid username or password. Please try again.'}), 401)
 
@@ -98,7 +98,7 @@ def logout():
     return redirect("/")
 
 
-@app.route("/dashboard", methods=["GET"])
+@app.route("/index", methods=["GET"])
 def view_photos():
     if "user_id" not in session:
         return redirect("/login")  
@@ -119,12 +119,12 @@ def view_photos():
         
         img_data.append({"img_url": blob_client.url, "username": username})
     
-    return render_template("dashboard.html", img_data=img_data)
+    return render_template("index.html", img_data=img_data)
 
 # Upload photos route (restricted to logged-in users)
 @app.route("/upload-photos", methods=["POST"])
 def upload_photos():
-    #Check if the user is logged in
+    # Check if the user is logged in
     if "user_id" not in session:
         return redirect("/login")  # Redirect to login page if not logged in
 
@@ -141,7 +141,7 @@ def upload_photos():
         except Exception as e:
             print("Ignoring duplicate filenames", e)  # Ignore duplicates
     
-    return redirect("/dashboard")
+    return redirect("/index")
 
 @app.route("/")
 def homepage():
