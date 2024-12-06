@@ -1,28 +1,21 @@
-from flask import Flask, render_template, request, redirect, session, make_response, jsonify
+from flask import Flask, render_template, request, redirect, jsonify
 from azure.storage.blob import BlobServiceClient
 import os
-import bcrypt
 from dotenv import load_dotenv
-from decorators.token import create_token
 from pymongo import MongoClient
-from bson import ObjectId  
-from pymongo.collection import Collection
-from pymongo.database import Database
+from bson import ObjectId
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'mysecret'
 
-# access your MongoDB Atlas cluster
+# Access MongoDB Atlas cluster
 load_dotenv()
-connection_string: str = os.getenv("CONNECTION_STRING")
-mongo_client: MongoClient = MongoClient(connection_string)
+connection_string = os.getenv("CONNECTION_STRING")
+mongo_client = MongoClient(connection_string)
 
-# add in your database and collection from Atlas
-database: Database = mongo_client.get_database("users")
-collection: Collection = database.get_collection("Cloud")
-collection2: Collection = database.get_collection("blacklist")
-
-
-
+# Add in your database and collection from Atlas
+database = mongo_client.get_database("media_app")
+posts_collection = database.get_collection("posts")
 
 # Azure Blob Storage connection setup
 connect_str = os.getenv("connect_str")
@@ -32,120 +25,84 @@ blob_service_client = BlobServiceClient.from_connection_string(conn_str=connect_
 try:
     container_client = blob_service_client.get_container_client(container_name)
     container_client.get_container_properties()
-except Exception as e:
+except Exception:
     container_client = blob_service_client.create_container(container_name)
 
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        # Get the form data
-        name = request.form.get('name')
-        username = request.form.get('username')
-        password = request.form.get('password')
-        email = request.form.get('email')
-        
-        # Check if the username already exists
-        existing_user = collection.find_one({"username": username})
-        if existing_user:
-            return make_response(jsonify({'message': 'Username already exists. Please choose a different username.'}), 409)
-
-       
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-        
-        new_user = {
-            "name": name,
-            "username": username,
-            "password": hashed_password,  
-            "email": email
-        }
-        collection.insert_one(new_user)
-
-        return redirect('/dashboard')
-
-    return render_template("register.html")
-
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if 'user_id' in session:
-        return make_response(jsonify({'message': 'You are already logged in. Please log out before attempting to log in again.'}), 409)
-
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        
-        user = collection.find_one({"username": username})
-        if user and bcrypt.checkpw(password.encode('utf-8'), user["password"]):
-            token = create_token(user)
-            session.clear()
-            session['user_id'] = str(user['_id'])
-            session['username'] = str(user['username'])
-            return redirect("/dashboard")
-        else:
-            return make_response(jsonify({'message': 'Invalid username or password. Please try again.'}), 401)
-
-    return render_template("login.html")
-
-@app.route('/logout', methods=["GET"])
-def logout():
-    token = request.headers.get('x-access-token')
-    if token:
-        
-        collection2.insert_one({'token': token})
-    
-    session.clear()
-    return redirect("/")
-
-
-@app.route("/dashboard", methods=["GET"])
-def view_photos():
-    if "user_id" not in session:
-        return redirect("/login")  
-    img_data = []
-
-   
-    blob_items = container_client.list_blobs()  
-    
-    for blob in blob_items:
-        blob_client = container_client.get_blob_client(blob=blob.name)
-        
-        
-        user_id = blob.name.split('/')[0]   
-        
-        # Fetch the user's username
-        user = collection.find_one({"_id": ObjectId(user_id)})  # Use ObjectId here
-        username = user["username"] if user else "Unknown User"
-        
-        img_data.append({"img_url": blob_client.url, "username": username})
-    
-    return render_template("dashboard.html", img_data=img_data)
-
-# Upload photos route (restricted to logged-in users)
-@app.route("/upload-photos", methods=["POST"])
-def upload_photos():
-    # Check if the user is logged in
-    if "user_id" not in session:
-        return redirect("/login")  # Redirect to login page if not logged in
-
-    user_id = session['user_id']
-    filenames = ""
-
-    # Upload the files
-    for file in request.files.getlist("photos"):
-        try:
-            # Save the file in the user-specific folder (with user_id)
-            blob_name = f'{user_id}/{file.filename}'
-            container_client.upload_blob(blob_name, file)  # Upload file to Azure Blob
-            filenames += file.filename + "<br />"
-        except Exception as e:
-            print("Ignoring duplicate filenames", e)  # Ignore duplicates
-    
-    return redirect("/dashboardb")
-
 @app.route("/")
 def homepage():
-    return render_template("home.html")
+    # Fetch all posts from MongoDB
+    posts = list(posts_collection.find())
+    for post in posts:
+        post['_id'] = str(post['_id'])  # Convert ObjectId to string for JSON serialization
+    return render_template("index.html", posts=posts)
+
+
+@app.route("/upload", methods=["POST"])
+def upload_photo():
+    file = request.files.get("photo")
+    caption = request.form.get("caption")
+
+    if not file:
+        return jsonify({"message": "No file provided"}), 400
+
+    try:
+        # Upload the file to Azure Blob Storage
+        blob_name = file.filename
+        container_client.upload_blob(blob_name, file)
+
+        # Save metadata in MongoDB
+        new_post = {
+            "caption": caption,
+            "blob_name": blob_name,
+            "blob_url": container_client.get_blob_client(blob_name).url,
+        }
+        posts_collection.insert_one(new_post)
+
+        return redirect("/")
+    except Exception as e:
+        return jsonify({"message": f"Failed to upload file: {e}"}), 500
+
+
+@app.route("/edit/<post_id>", methods=["PUT"])
+def edit_caption(post_id):
+    new_caption = request.form.get("caption")
+    if not new_caption:
+        return jsonify({"message": "Caption cannot be empty"}), 400
+
+    updated_result = posts_collection.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$set": {"caption": new_caption}}
+    )
+
+    if updated_result.matched_count == 0:
+        return jsonify({"message": "Post not found"}), 404
+
+    return jsonify({"message": "Caption updated successfully"}), 200
+
+
+@app.route("/delete/<post_id>", methods=["POST"])
+def delete_post(post_id):
+    if request.form.get('_method') == 'DELETE':
+        # Proceed with deletion logic
+        try:
+            post = posts_collection.find_one({"_id": ObjectId(post_id)})
+            if not post:
+                return jsonify({"message": "Post not found"}), 404
+
+            # Delete the blob from Azure Blob Storage
+            blob_name = post["blob_name"]
+            container_client.delete_blob(blob_name)
+
+            # Delete metadata from MongoDB
+            posts_collection.delete_one({"_id": ObjectId(post_id)})
+
+            return jsonify({"message": "Post deleted successfully"}), 200
+        except Exception as e:
+            return jsonify({"message": f"Failed to delete post: {e}"}), 500
+
+
+
 
 if __name__ == "__main__":
     app.run(debug=True)
