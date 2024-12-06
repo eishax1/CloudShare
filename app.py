@@ -85,7 +85,7 @@ def login():
         else:
             return make_response(jsonify({'message': 'Invalid username or password. Please try again.'}), 401)
 
-    #return render_template("login.html")
+    return render_template("login.html")
 
 @app.route('/logout', methods=["GET"])
 def logout():
@@ -98,7 +98,7 @@ def logout():
     return redirect("/")
 
 
-@app.route("/index", methods=["GET"])
+@app.route("/dashboard", methods=["GET"])
 def view_photos():
     if "user_id" not in session:
         return redirect("/login")  
