@@ -61,7 +61,7 @@ def register():
         }
         collection.insert_one(new_user)
 
-        return redirect('/index')
+        return redirect('/')
 
     return render_template("register.html")
 
@@ -100,8 +100,8 @@ def logout():
 
 @app.route("/index", methods=["GET"])
 def view_photos():
-    if "user_id" not in session:
-        return redirect("/login")  
+    #if "user_id" not in session:
+        #return redirect("/login")  
     img_data = []
 
    
@@ -125,8 +125,8 @@ def view_photos():
 @app.route("/upload-photos", methods=["POST"])
 def upload_photos():
     # Check if the user is logged in
-    if "user_id" not in session:
-        return redirect("/login")  # Redirect to login page if not logged in
+    #if "user_id" not in session:
+        #return redirect("/login")  # Redirect to login page if not logged in
 
     user_id = session['user_id']
     filenames = ""
