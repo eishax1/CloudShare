@@ -5,33 +5,37 @@ from dotenv import load_dotenv
 from pymongo import MongoClient
 from bson import ObjectId
 
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'mysecret'
 
-# Access MongoDB Atlas cluster
+# Load environment variables
 load_dotenv()
-connection_string = os.getenv("CONNECTION_STRING")
-mongo_client = MongoClient(connection_string)
 
-# Add in your database and collection from Atlas
-database = mongo_client.get_database("media_app")
-posts_collection = database.get_collection("posts")
+# Initialize Flask app
+app = Flask(__name__)
+
+
+# MongoDB (Cosmos DB Mongo API) connection
+connection_string = os.getenv("mongoUrl")  
+client = MongoClient(connection_string)
+database = client.media_dt
+posts_collection = database.posts_dt
 
 # Azure Blob Storage connection setup
-connect_str = os.getenv("connect_str")
-container_name = "media"
+connect_str = os.getenv("connect_str")  # Blob storage connection string from .env
+container_name = "media"  
 blob_service_client = BlobServiceClient.from_connection_string(conn_str=connect_str)
 
 try:
+    # Ensure the container exists
     container_client = blob_service_client.get_container_client(container_name)
     container_client.get_container_properties()
 except Exception:
+    # Create the container if it does not exist
     container_client = blob_service_client.create_container(container_name)
 
 
 @app.route("/")
 def homepage():
-    # Fetch all posts from MongoDB
+    """Display all posts from the database."""
     posts = list(posts_collection.find())
     for post in posts:
         post['_id'] = str(post['_id'])  # Convert ObjectId to string for JSON serialization
@@ -40,6 +44,7 @@ def homepage():
 
 @app.route("/upload", methods=["POST"])
 def upload_photo():
+    """Upload a photo and save metadata to the database."""
     file = request.files.get("photo")
     caption = request.form.get("caption")
 
@@ -51,7 +56,7 @@ def upload_photo():
         blob_name = file.filename
         container_client.upload_blob(blob_name, file)
 
-        # Save metadata in MongoDB
+        # Save metadata in cosmosdb
         new_post = {
             "caption": caption,
             "blob_name": blob_name,
@@ -66,6 +71,7 @@ def upload_photo():
 
 @app.route("/edit/<post_id>", methods=["PUT"])
 def edit_caption(post_id):
+    """Edit the caption of a post."""
     new_caption = request.form.get("caption")
     if not new_caption:
         return jsonify({"message": "Caption cannot be empty"}), 400
@@ -83,8 +89,8 @@ def edit_caption(post_id):
 
 @app.route("/delete/<post_id>", methods=["POST"])
 def delete_post(post_id):
+    """Delete a post and its corresponding blob."""
     if request.form.get('_method') == 'DELETE':
-        # Proceed with deletion logic
         try:
             post = posts_collection.find_one({"_id": ObjectId(post_id)})
             if not post:
@@ -102,7 +108,6 @@ def delete_post(post_id):
             return jsonify({"message": f"Failed to delete post: {e}"}), 500
 
 
-
-
 if __name__ == "__main__":
+    # Run the Flask app
     app.run(debug=True)
